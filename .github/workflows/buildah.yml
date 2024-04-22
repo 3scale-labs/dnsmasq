@@ -56,7 +56,7 @@ jobs:
           extra-args: |
             --squash
           containerfiles: |
-            Copntainerfile
+            Containerfile
 
       - name: Echo Outputs
         run: |
