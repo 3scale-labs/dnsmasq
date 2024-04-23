@@ -6,7 +6,7 @@ on:
       custom_tag:
         description: optional custom tag on remote repo you want image to be tagged with
         required: false
-        default: ''
+        default: 'latest'
         type: string
     secrets:
       QUAY_USER_NAME:
