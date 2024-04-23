@@ -1,0 +1,79 @@
+name: Build dnsmasq oci container image
+
+on:
+  push:
+    branches:
+      - gh-actions
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: optional custom tag on remote repo you want image to be tagged with
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: quay.io
+  IMAGE_NAME: 3scale/dnsmasq
+
+jobs:
+  buildah:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Red Hat Registry
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.QUAY_USER_NAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=schedule
+            type=ref,event=branch,enable=${{ github.ref_name != 'main' && inputs.custom_tag == '' }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+            type=raw,value=nightly,enable=${{ github.ref_name == 'main' }}
+            ${{ inputs.custom_tag }}
+            type=ref,event=tag
+            type=ref,event=pr
+
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          layers: false
+          oci: true
+          tls-verify: true
+          extra-args: |
+            --squash
+          containerfiles: |
+            Containerfile
+
+      - name: Echo Outputs
+        run: |
+          echo "Image: ${{ steps.build-image.outputs.image }}"
+          echo "Tags: ${{ steps.build-image.outputs.tags }}"
+          echo "Tagged Image: ${{ steps.build-image.outputs.image-with-tag }}"
+
+      - name: Check images created
+        run: buildah images
+
+      - name: Push To quay.io
+        id: push-to-quay
+        uses: redhat-actions/push-to-registry@v2
+        if: github.event_name != 'pull_request'
+        with:
+          tags: ${{ steps.build-image.outputs.tags }}
+
+      - name: Print image url
+        run: echo "Image pushed to ${{ steps.push-to-quay.outputs.registry-paths }}"
+
