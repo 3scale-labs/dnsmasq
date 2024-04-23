@@ -1,9 +1,6 @@
 name: Build dnsmasq oci container image
 
 on:
-  push:
-    branches:
-      - gh-actions
   workflow_dispatch:
     inputs:
       custom_tag:
